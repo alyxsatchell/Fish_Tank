@@ -10,6 +10,7 @@ pub enum Direction{
     Right = 1
 }
 
+#[derive(Clone)]
 pub struct Color{
     r: u8,
     b: u8,
@@ -18,6 +19,8 @@ pub struct Color{
 }
 
 const water_blue: Color = Color{r:0, b:200, g: 50, a: 70};
+const dir_modifier_step: u8 = 9;
+const dir_modifier_start: u8 = 91;
 
 pub struct Cell{
     color: Color,
@@ -26,15 +29,16 @@ pub struct Cell{
 
 #[derive(Clone)]
 pub struct Pos{
-    x: u8,
-    y: u8
+    x: i32,
+    y: i32
 }
-
 
 pub struct Fishy {
     position: Pos,
     // name: String,
+    swim_speed: u8,
     direction: Direction,
+    dir_count: u8,
     color: Color,
     // health: u8
 }
@@ -46,13 +50,14 @@ pub struct FishTank {
     // OxygenMap intended a feature to be added
 }
 
+
 impl Color {
     pub fn new_rand() -> Color{
         let mut rng = rand::thread_rng();
-        let red: u8 = rng.gen_range(0..255);
-        let green: u8 = rng.gen_range(0..255);
-        let blue: u8 = rng.gen_range(0..255);
-        let alpha: u8 = rng.gen_range(0..255);
+        let red: u8 = rng.gen_range(0..=255);
+        let green: u8 = rng.gen_range(0..=255);
+        let blue: u8 = rng.gen_range(0..=255);
+        let alpha: u8 = rng.gen_range(0..=255);
         return Color { r: red, b: blue, g: green, a: alpha } 
     }
 }
@@ -70,7 +75,7 @@ impl Direction{
     pub fn new_rand() -> Direction {
         let mut rng = rand::thread_rng();
         let dir:Direction;
-        match rng.gen_range(0..3) {
+        match rng.gen_range(0..=3) {
             0 => dir = Direction::Up,
             1 => dir = Direction::Right,
             2 => dir = Direction::Down,
@@ -78,6 +83,16 @@ impl Direction{
         }
         return dir
     }
+
+    pub fn invert(&self) -> Direction {
+        match self{
+            Direction::Up => return Direction::Down,
+            Direction::Down => return Direction::Up,
+            Direction::Left => return Direction::Right,
+            Direction::Right => return Direction::Left,
+        }
+    }
+
 }
 
 impl Cell{
@@ -91,7 +106,67 @@ impl Fishy {
         let color = Color::new_rand();
         let pos = Pos::new_rand(size);
         let dir = Direction::new_rand();
-        return Fishy{color: color, position: pos, direction: dir}
+        let dir_count = 0;
+        let swim_speed = 1;
+        return Fishy{color: color, position: pos, swim_speed: swim_speed, direction: dir, dir_count: dir_count}
+    }
+
+
+    pub fn new_dir(& mut self){
+        let cur_dir = &self.direction;
+        let dir_count = self.dir_count;
+        let rng: u8 = rand::thread_rng().gen_range(0..=100);
+        let mut dirs = vec![Direction::Up, Direction::Right, Direction::Down, Direction::Left];
+        match cur_dir {
+            Direction::Up => dirs.remove(0),
+            Direction::Right => dirs.remove(1),
+            Direction::Down => dirs.remove(2),
+            Direction::Left => dirs.remove(3),
+        };
+        let dir_modifier = dir_count * dir_modifier_step;
+        let mut same = dir_modifier_start - dir_modifier;
+        if 100 - same <= 0{
+            same = 10;
+        }
+        let rest = (100 - same) / 3;
+        let rest1 = same + rest;
+        let rest2 = rest1 + rest;
+        let rest3 = rest2 + rest;
+        if (0..same).contains(&rng){
+        }
+        else if (same..rest1).contains(&rng){
+            self.direction = dirs.remove(0);
+        }
+        else if (rest1..rest2).contains(&rng){
+            self.direction = dirs.remove(1);
+        }
+        else if (rest2..rest3).contains(&rng){
+            self.direction = dirs.remove(2);
+        }
+
+    }
+
+    fn swim_dir(&self) -> (i32,i32) {
+        let mut x: i32 = self.position.x;
+        let mut y: i32 = self.position.y;
+        match self.direction{
+            Direction::Up => y = self.position.y as i32 - self.swim_speed as i32,
+            Direction::Down => y = self.position.y as i32 + self.swim_speed as i32,
+            Direction::Left => x = self.position.x as i32 - self.swim_speed as i32,
+            Direction::Right => x = self.position.x as i32 + self.swim_speed as i32,
+        }
+        return (x,y)
+    }
+
+    pub fn swim(& mut self, size: Pos){
+        self.new_dir();
+        let (mut x,mut y) = self.swim_dir();
+        if (x < 0) || (y < 0) || (x > size.x - 1) || (y > size.y - 1){
+            self.direction = self.direction.invert();
+            (x,y) = self.swim_dir();
+        }
+        self.position.x = x;
+        self. position.y = y;
     }
 }
 
@@ -112,8 +187,10 @@ impl FishTank{
             let x = fish.position.x;
             let y = fish.position.y;
             let fish_c = Rc::clone(&fish);
+            let fish_color = fish.color.clone();
             fishys.push(fish);
             grid[y as usize][x as usize].fisk = Some(Rc::clone(&fish_c));
+            grid[y as usize][x as usize].color = fish_color;
         }
         return FishTank { size: size, fishys: fishys, grid: grid }
     }
@@ -174,4 +251,5 @@ impl fmt::Display for FishTank{
 fn main(){
     let fish_tank = FishTank::new(1, Pos{x:3,y:3});
     println!("{}", fish_tank);
+
 }
