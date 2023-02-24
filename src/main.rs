@@ -1,4 +1,5 @@
 use rand::prelude::*;
+use std::cell::RefCell;
 use std::fmt;
 use std::rc::Rc;
 
@@ -24,7 +25,7 @@ const dir_modifier_start: u8 = 91;
 
 pub struct Cell{
     color: Color,
-    fisk: Option<Rc<Fishy>>
+    fisk: Option<Rc<RefCell<Fishy>>>
 }
 
 #[derive(Clone)]
@@ -45,7 +46,7 @@ pub struct Fishy {
 
 pub struct FishTank {
     size: Pos,
-    fishys: Vec<Rc<Fishy>>,
+    fishys: Vec<Rc<RefCell<Fishy>>>,
     grid: Vec<Vec<Cell>>
     // OxygenMap intended a feature to be added
 }
@@ -98,6 +99,11 @@ impl Direction{
 impl Cell{
     pub fn new(color: Color) -> Cell{
         return Cell{color, fisk: None}
+    }
+
+    pub fn reset(& mut self){
+        self.fisk = None;
+        self.color = water_blue;
     }
 }
 
@@ -158,15 +164,17 @@ impl Fishy {
         return (x,y)
     }
 
-    pub fn swim(& mut self, size: Pos){
+    pub fn swim(& mut self, size: &Pos, grid: & mut Vec<Vec<Cell>>) -> (i32, i32){
         self.new_dir();
+        grid[self.position.y as usize][self.position.x as usize].reset();
         let (mut x,mut y) = self.swim_dir();
         if (x < 0) || (y < 0) || (x > size.x - 1) || (y > size.y - 1){
             self.direction = self.direction.invert();
             (x,y) = self.swim_dir();
         }
         self.position.x = x;
-        self. position.y = y;
+        self.position.y = y;
+        return (x,y)
     }
 }
 
@@ -183,16 +191,31 @@ impl FishTank{
         }
         for i in 0..fish_count{
             let size_c = size.clone();
-            let fish = Rc::new(Fishy::new(size_c));
-            let x = fish.position.x;
-            let y = fish.position.y;
+            let fish_temp = Fishy::new(size_c);
+            let x = fish_temp.position.x;
+            let y = fish_temp.position.y;
+            let fish_color = fish_temp.color.clone();
+            let fish = Rc::new(RefCell::new(fish_temp));
             let fish_c = Rc::clone(&fish);
-            let fish_color = fish.color.clone();
+            // let fish = Rc::new(RefCell::new(Fishy::new(size_c)));
+            // let x = fish.position.x;
+            // let y = fish.position.y;
+            // let fish_c = Rc::clone(&fish);
+            // let fish_color = fish.color.clone();
             fishys.push(fish);
             grid[y as usize][x as usize].fisk = Some(Rc::clone(&fish_c));
             grid[y as usize][x as usize].color = fish_color;
         }
         return FishTank { size: size, fishys: fishys, grid: grid }
+    }
+
+    pub fn tick(& mut self){
+        let size = self.size.clone();
+        for fishy in &self.fishys{
+            let (x,y) = fishy.borrow_mut().swim(&size, & mut self.grid);
+            self.grid[y as usize][x as usize].color = fishy.borrow().color.clone();
+            self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
+        }
     }
 }
 
@@ -236,7 +259,8 @@ impl fmt::Display for Fishy{
 impl fmt::Display for FishTank{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for i in &self.fishys{
-            writeln!(f, "{}", i);
+            let fishy = i.borrow();
+            writeln!(f, "{}", fishy);
         }
         for i in &self.grid{
             for ii in i{
@@ -249,7 +273,11 @@ impl fmt::Display for FishTank{
 }
 
 fn main(){
-    let fish_tank = FishTank::new(1, Pos{x:3,y:3});
+    let mut fish_tank = FishTank::new(1, Pos{x:3,y:3});
     println!("{}", fish_tank);
+    for i in 0..10{
+        fish_tank.tick();
+        println!("{}", fish_tank);
+    }
 
 }
