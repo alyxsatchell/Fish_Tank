@@ -165,15 +165,65 @@ impl Fishy {
     }
 
     pub fn swim(& mut self, size: &Pos, grid: & mut Vec<Vec<Cell>>) -> (i32, i32){
-        self.new_dir();
         grid[self.position.y as usize][self.position.x as usize].reset();
+        self.new_dir();
         let (mut x,mut y) = self.swim_dir();
+        let mut hit_wall = false;
         if (x < 0) || (y < 0) || (x > size.x - 1) || (y > size.y - 1){
             self.direction = self.direction.invert();
+            hit_wall = true;
             (x,y) = self.swim_dir();
+        }
+        let mut cell = &grid[y as usize][x as usize];
+        if cell.fisk.is_some(){
+            if hit_wall{
+                (x,y) = (self.position.x, self.position.y)
+            }
+            else{
+                self.direction = self.direction.invert();
+                (x,y) = self.swim_dir();
+            }
         }
         self.position.x = x;
         self.position.y = y;
+        let mut cell = & mut grid[self.position.y as usize][self.position.x as usize];
+        cell.color = self.color.clone();
+        return (x,y)
+    }
+
+    pub fn swim_test(& mut self, size: &Pos, grid: & mut Vec<Vec<Cell>>, dir: Direction) -> (i32, i32){
+                grid[self.position.y as usize][self.position.x as usize].reset();
+        self.direction = dir;
+        let (mut x,mut y) = self.swim_dir();
+        let mut hit_wall = false;
+        if (x < 0) || (y < 0) || (x > size.x - 1) || (y > size.y - 1){
+            println!("Hit Wall");
+            self.direction = self.direction.invert();
+            hit_wall = true;
+            (x,y) = self.swim_dir();
+        }
+        let mut cell = &grid[y as usize][x as usize];
+        if cell.fisk.is_some(){
+            println!("True");
+        }
+        else if cell.fisk.is_none(){
+            println!("FALSE");
+        }
+
+        if cell.fisk.is_some(){
+            println!("There is kinda a fish in the way!");
+            if hit_wall{
+                (x,y) = (self.position.x, self.position.y)
+            }
+            else{
+                self.direction = self.direction.invert();
+                (x,y) = self.swim_dir();
+            }
+        }
+        self.position.x = x;
+        self.position.y = y;
+        let mut cell = & mut grid[self.position.y as usize][self.position.x as usize];
+        cell.color = self.color.clone();
         return (x,y)
     }
 }
@@ -197,13 +247,8 @@ impl FishTank{
             let fish_color = fish_temp.color.clone();
             let fish = Rc::new(RefCell::new(fish_temp));
             let fish_c = Rc::clone(&fish);
-            // let fish = Rc::new(RefCell::new(Fishy::new(size_c)));
-            // let x = fish.position.x;
-            // let y = fish.position.y;
-            // let fish_c = Rc::clone(&fish);
-            // let fish_color = fish.color.clone();
             fishys.push(fish);
-            grid[y as usize][x as usize].fisk = Some(Rc::clone(&fish_c));
+            grid[y as usize][x as usize].fisk = Some(fish_c);
             grid[y as usize][x as usize].color = fish_color;
         }
         return FishTank { size: size, fishys: fishys, grid: grid }
@@ -213,7 +258,26 @@ impl FishTank{
         let size = self.size.clone();
         for fishy in &self.fishys{
             let (x,y) = fishy.borrow_mut().swim(&size, & mut self.grid);
-            self.grid[y as usize][x as usize].color = fishy.borrow().color.clone();
+            // self.grid[y as usize][x as usize].color = fishy.borrow().color.clone();
+            self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
+        }
+    }
+
+    pub fn fish_collider(& mut self){
+        let size = self.size.clone();
+        let mut counter = 0;
+        let mut dir: Direction;
+        for fishy in &self.fishys{
+            println!("{}, {}", self, fishy.borrow().color);
+            if counter % 2 == 0{
+                dir = Direction::Left;
+            }
+            else {
+                dir = Direction::Right;
+            }
+            counter += 1;
+            let (x,y) = fishy.borrow_mut().swim_test(&size, & mut self.grid, dir);
+            // self.grid[y as usize][x as usize].color = fishy.borrow().color.clone();
             self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
         }
     }
@@ -273,11 +337,22 @@ impl fmt::Display for FishTank{
 }
 
 fn main(){
-    let mut fish_tank = FishTank::new(1, Pos{x:3,y:3});
+    let mut fish_tank = FishTank::new(2, Pos{x:3,y:3});
     println!("{}", fish_tank);
-    for i in 0..10{
+    for _i in 0..10{
         fish_tank.tick();
         println!("{}", fish_tank);
     }
+    //Fish Collision Tests In A Controlled Environment
+    // let nebula = Rc::new(RefCell::new(Fishy{position: Pos{x:0, y:0}, swim_speed: 1, direction: Direction::Right, dir_count: 0, color: Color::new_rand()}));
+    // let red_aqua = Rc::new(RefCell::new(Fishy{position: Pos{x:2, y:0}, swim_speed: 1, direction: Direction::Left, dir_count: 0, color: Color::new_rand()}));
+    // let fishys = vec![Rc::clone(&nebula),Rc::clone(&red_aqua)];
+    // let grid:Vec<Vec<Cell>> = vec![vec![Cell{color: water_blue, fisk: Some(Rc::clone(&nebula))}, Cell{color: water_blue, fisk: None}, Cell{color: water_blue, fisk: Some(Rc::clone(&red_aqua))}], vec![Cell{color: water_blue, fisk: None},Cell{color: water_blue, fisk: None},Cell{color: water_blue, fisk: None}]];
+    // let mut fish_tank = FishTank { size: Pos{x:3,y:2}, fishys: fishys, grid: grid};
+    // println!("{}", fish_tank);
+    // for i in 0..10{
+    //     fish_tank.fish_collider();
+    //     println!("{}", fish_tank)
+    // }
 
 }
