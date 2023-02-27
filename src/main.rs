@@ -23,6 +23,10 @@ const water_blue: Color = Color{r:0, b:200, g: 50, a: 70};
 const dir_modifier_step: u8 = 9;
 const dir_modifier_start: u8 = 91;
 
+pub fn check_wall(pos: (i32,i32), size: &Pos) -> bool{
+    return (pos.0 < 0) || (pos.1 < 0) || (pos.0 > size.x - 1) || (pos.1 > size.y - 1)
+}
+
 pub struct Cell{
     color: Color,
     fisk: Option<Rc<RefCell<Fishy>>>
@@ -168,20 +172,26 @@ impl Fishy {
         grid[self.position.y as usize][self.position.x as usize].reset();
         self.new_dir();
         let (mut x,mut y) = self.swim_dir();
-        let mut hit_wall = false;
-        if (x < 0) || (y < 0) || (x > size.x - 1) || (y > size.y - 1){
+        let mut hit_wall = check_wall((x,y), size);
+        if hit_wall{
+            println!("Hit Wall");
             self.direction = self.direction.invert();
             hit_wall = true;
             (x,y) = self.swim_dir();
         }
         let mut cell = &grid[y as usize][x as usize];
         if cell.fisk.is_some(){
+            println!("Bonk");
             if hit_wall{
+                println!("Stickin it out");
                 (x,y) = (self.position.x, self.position.y)
             }
             else{
                 self.direction = self.direction.invert();
                 (x,y) = self.swim_dir();
+                if check_wall((x,y), size){
+                    (x,y) = (self.position.x, self.position.y);
+                }
             }
         }
         self.position.x = x;
@@ -192,7 +202,7 @@ impl Fishy {
     }
 
     pub fn swim_test(& mut self, size: &Pos, grid: & mut Vec<Vec<Cell>>, dir: Direction) -> (i32, i32){
-                grid[self.position.y as usize][self.position.x as usize].reset();
+        grid[self.position.y as usize][self.position.x as usize].reset();
         self.direction = dir;
         let (mut x,mut y) = self.swim_dir();
         let mut hit_wall = false;
@@ -339,7 +349,7 @@ impl fmt::Display for FishTank{
 fn main(){
     let mut fish_tank = FishTank::new(2, Pos{x:3,y:3});
     println!("{}", fish_tank);
-    for _i in 0..10{
+    for _i in 0..100{
         fish_tank.tick();
         println!("{}", fish_tank);
     }
