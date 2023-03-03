@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use rand::prelude::*;
 use std::cell::RefCell;
-use std::fmt;
+use std::{fmt, vec};
 use std::rc::Rc;
 
 #[wasm_bindgen]
@@ -21,12 +21,27 @@ pub struct Color{
     a: u8
 }
 
-const water_blue: Color = Color{r:0, b:200, g: 50, a: 70};
+const fish_tank_size: Pos = Pos{x:255,y:255};
+const canvas_size: usize = (fish_tank_size.x * fish_tank_size.y * 4) as usize;
+const water_blue: Color = Color{r:0, g:100, b:255, a: 200};
 const dir_modifier_step: u8 = 9;
 const dir_modifier_start: u8 = 91;
 
 pub fn check_wall(pos: (i32,i32), size: &Pos) -> bool{
     return (pos.0 < 0) || (pos.1 < 0) || (pos.0 > size.x - 1) || (pos.1 > size.y - 1)
+}
+
+extern crate console_error_panic_hook;
+use std::panic;
+
+#[wasm_bindgen]
+pub fn my_init_function() {
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
+}
+
+#[wasm_bindgen]
+pub fn tick(fish_tank: &mut FishTank){
+    fish_tank.tick();
 }
 
 #[wasm_bindgen]
@@ -57,7 +72,8 @@ pub struct Fishy {
 pub struct FishTank {
     size: Pos,
     fishys: Vec<Rc<RefCell<Fishy>>>,
-    grid: Vec<Vec<Cell>>
+    grid: Vec<Vec<Cell>>,
+    canvas: Vec<u8>
     // OxygenMap intended a feature to be added
 }
 
@@ -68,8 +84,12 @@ impl Color {
         let red: u8 = rng.gen_range(0..=255);
         let green: u8 = rng.gen_range(0..=255);
         let blue: u8 = rng.gen_range(0..=255);
-        let alpha: u8 = rng.gen_range(0..=255);
+        let alpha: u8 = rng.gen_range(0..=100);
         return Color { r: red, b: blue, g: green, a: alpha } 
+    }
+
+    pub fn get_color_values(&self) -> (u8,u8,u8,u8){
+        return (self.r, self.g, self.b, self.a)
     }
 }
 
@@ -78,6 +98,13 @@ impl Pos{
         let mut rng = rand::thread_rng();
         let x = rng.gen_range(0..size.x);
         let y = rng.gen_range(0..size.y);
+        return Pos{x,y}
+    }
+}
+
+#[wasm_bindgen]
+impl Pos{
+    pub fn new(x:i32, y:i32) -> Pos{
         return Pos{x,y}
     }
 }
@@ -245,6 +272,40 @@ impl Fishy {
 }
 
 impl FishTank{
+    pub fn fish_collider(& mut self){
+        let size = self.size.clone();
+        let mut counter = 0;
+        let mut dir: Direction;
+        for fishy in &self.fishys{
+            println!("{}, {}", self, fishy.borrow().color);
+            if counter % 2 == 0{
+                dir = Direction::Left;
+            }
+            else {
+                dir = Direction::Right;
+            }
+            counter += 1;
+            let (x,y) = fishy.borrow_mut().swim_test(&size, & mut self.grid, dir);
+            // self.grid[y as usize][x as usize].color = fishy.borrow().color.clone();
+            self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl Cell{
+    pub fn color(&self) -> String{
+        return self.color.to_string();
+    }
+
+    pub fn insert_color(&self){
+
+    }
+}
+
+#[wasm_bindgen]
+impl FishTank{
+    // #[wasm_bindgen(constructor)]
     pub fn new(fish_count: u8, size: Pos) -> FishTank{
         let mut fishys = Vec::new();
         let mut grid = Vec::new();
@@ -267,40 +328,41 @@ impl FishTank{
             grid[y as usize][x as usize].fisk = Some(fish_c);
             grid[y as usize][x as usize].color = fish_color;
         }
-        return FishTank { size: size, fishys: fishys, grid: grid }
+        return FishTank { size: size, fishys: fishys, grid: grid, canvas: vec![0;canvas_size]}
     }
 
-
-
-    pub fn fish_collider(& mut self){
-        let size = self.size.clone();
-        let mut counter = 0;
-        let mut dir: Direction;
-        for fishy in &self.fishys{
-            println!("{}, {}", self, fishy.borrow().color);
-            if counter % 2 == 0{
-                dir = Direction::Left;
+    pub fn push_canvas(&mut self){
+        let mut red: u8;
+        let mut blue: u8;
+        let mut green: u8;
+        let mut alpha: u8;
+        for (x, row) in self.grid.iter().enumerate(){
+            for (y, cell) in row.iter().enumerate(){
+                (red, green, blue, alpha) = cell.color.get_color_values();
+                let index: usize = ((y as i32 * self.size.x + x as i32) * 4) as usize;
+                    self.canvas[index] = red;
+                    self.canvas[index + 1] = green;
+                    self.canvas[index + 2] = blue;
+                    self.canvas[index + 3] = alpha;
             }
-            else {
-                dir = Direction::Right;
-            }
-            counter += 1;
-            let (x,y) = fishy.borrow_mut().swim_test(&size, & mut self.grid, dir);
-            // self.grid[y as usize][x as usize].color = fishy.borrow().color.clone();
-            self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
         }
     }
-}
 
-#[wasm_bindgen]
-impl FishTank{
+    pub fn get_canvas(&self) -> *const u8{
+        return self.canvas.as_ptr()
+    }
+
     pub fn tick(& mut self){
         let size = self.size.clone();
         for fishy in &self.fishys{
             let (x,y) = fishy.borrow_mut().swim(&size, & mut self.grid);
-            // self.grid[y as usize][x as usize].color = fishy.borrow().color.clone();
             self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
         }
+        self.push_canvas();
+    }
+
+    pub fn print(&self) -> String{
+        return self.to_string();
     }
 }
 
@@ -331,7 +393,8 @@ impl fmt::Display for Cell{
 
 impl fmt::Display for Color{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({},{},{},{})", self.r, self.g, self.b, self.a)
+        let alpha: f64 = self.a as f64 / 100.0;
+        write!(f, "rgba({},{},{},{})", self.r, self.g, self.b, alpha)
     }
 }
 
@@ -363,22 +426,24 @@ pub fn test() -> i32{
 }
 
 // fn main(){
-//     let mut fish_tank = FishTank::new(2, Pos{x:3,y:3});
-//     println!("{}", fish_tank);
-//     for _i in 0..100{
-//         fish_tank.tick();
-//         println!("{}", fish_tank);
-//     }
-//     //Fish Collision Tests In A Controlled Environment
-//     // let nebula = Rc::new(RefCell::new(Fishy{position: Pos{x:0, y:0}, swim_speed: 1, direction: Direction::Right, dir_count: 0, color: Color::new_rand()}));
-//     // let red_aqua = Rc::new(RefCell::new(Fishy{position: Pos{x:2, y:0}, swim_speed: 1, direction: Direction::Left, dir_count: 0, color: Color::new_rand()}));
-//     // let fishys = vec![Rc::clone(&nebula),Rc::clone(&red_aqua)];
-//     // let grid:Vec<Vec<Cell>> = vec![vec![Cell{color: water_blue, fisk: Some(Rc::clone(&nebula))}, Cell{color: water_blue, fisk: None}, Cell{color: water_blue, fisk: Some(Rc::clone(&red_aqua))}], vec![Cell{color: water_blue, fisk: None},Cell{color: water_blue, fisk: None},Cell{color: water_blue, fisk: None}]];
-//     // let mut fish_tank = FishTank { size: Pos{x:3,y:2}, fishys: fishys, grid: grid};
-//     // println!("{}", fish_tank);
-//     // for i in 0..10{
-//     //     fish_tank.fish_collider();
-//     //     println!("{}", fish_tank)
-//     // }
+//     let col = Color::new_rand();
+//     println!("{}", col);
+    // let mut fish_tank = FishTank::new(2, Pos{x:3,y:3});
+    // println!("{}", fish_tank);
+    // for _i in 0..100{
+    //     fish_tank.tick();
+    //     println!("{}", fish_tank);
+    // }
+    //Fish Collision Tests In A Controlled Environment
+    // let nebula = Rc::new(RefCell::new(Fishy{position: Pos{x:0, y:0}, swim_speed: 1, direction: Direction::Right, dir_count: 0, color: Color::new_rand()}));
+    // let red_aqua = Rc::new(RefCell::new(Fishy{position: Pos{x:2, y:0}, swim_speed: 1, direction: Direction::Left, dir_count: 0, color: Color::new_rand()}));
+    // let fishys = vec![Rc::clone(&nebula),Rc::clone(&red_aqua)];
+    // let grid:Vec<Vec<Cell>> = vec![vec![Cell{color: water_blue, fisk: Some(Rc::clone(&nebula))}, Cell{color: water_blue, fisk: None}, Cell{color: water_blue, fisk: Some(Rc::clone(&red_aqua))}], vec![Cell{color: water_blue, fisk: None},Cell{color: water_blue, fisk: None},Cell{color: water_blue, fisk: None}]];
+    // let mut fish_tank = FishTank { size: Pos{x:3,y:2}, fishys: fishys, grid: grid};
+    // println!("{}", fish_tank);
+    // for i in 0..10{
+    //     fish_tank.fish_collider();
+    //     println!("{}", fish_tank)
+    // }
 
 // }
