@@ -23,8 +23,9 @@ const runWasm = async () => {
     canvasContext.clearRect(0, 0, canvasElement.width, canvasElement.height);
     canvasContext.putImageData(canvasImageData, 0, 0);
   };
-  setInterval(() =>{
-    tick();
-  })
+  // setInterval(() =>{
+  //   tick();
+  // }, 1000/24)
+  tick();
 };
 runWasm();
