@@ -167,6 +167,7 @@ impl Body{
         let place_holder_color2: Color = Color{r:0, g:200, b:0, a:255};
         let place_holder_color3: Color = Color{r:200, g:200, b:0, a:255};
         let place_holder_color4: Color = Color{r:0,g:0, b:255, a:255};
+        let eye_color: Color = Color{r:0, b:0, g:0, a:255};
         // let place_holder_cell: Cell = Cell::new(place_holder_color);
         //gen center line length
         let mut matrix: Vec<Vec<Option<Color>>> = Vec::new();
@@ -180,25 +181,28 @@ impl Body{
         let below_count: f64 = fish_height as f64 - 1.0 - above_count;
         let center_line_length = length;
         let above_center_length = center_line_length - 1;
+        let eye_index = (center_line_length as f64 / 4.0 - 1.0).ceil() as usize;
         println!("Above: {}, Below: {}", above_count, below_count);
         //pushes the center line and the intial above and below at 1 less length then center
         matrix.push(vec![Some(place_holder_color.clone());center_line_length.into()]);
         matrix.insert(0, vec![Some(place_holder_color.clone());(center_line_length - 1).into()]);
+        //places the eye
+        matrix[0][eye_index].replace(eye_color.clone());
         matrix.push(vec![Some(place_holder_color.clone());above_center_length.into()]);
         //fills in the rest of the scales
+        //fills in the scales above the center line
         for line in 1..(above_count) as u8{
             let mut temp_matrix = vec![Some(place_holder_color.clone());(above_center_length - (2 * line)) as usize];
             for i in 1..line + 1{
                 temp_matrix.insert(0, None);
-                println!("test");
             }
             matrix.insert(0, temp_matrix);
         }
+        //fils in the scales below the center line
         for line in 1..(below_count) as u8{
             let mut temp_matrix = vec![Some(place_holder_color.clone());(above_center_length - (2 * line)) as usize];
             for i in 1..line + 1{
                 temp_matrix.insert(0, None);
-                println!("test");
             }
             matrix.push(temp_matrix);
         }
@@ -234,13 +238,7 @@ impl Body{
         temp_fin_vec.push(Some(place_holder_color3.clone()));
         matrix.push(temp_fin_vec);
 
-
-
         return matrix
-        //gen the fins based off of that
-        //place eye
-        //place rear fin
-        //insert blanks
     }
 
     pub fn new(fish_height: u8) -> Body{
