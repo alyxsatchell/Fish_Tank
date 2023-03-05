@@ -164,6 +164,9 @@ impl Cell{
 impl Body{
     fn gen_matrix(fish_height: u8) -> Vec<Vec<Option<Color>>>{
         let place_holder_color: Color = Color{r:200, g:0, b:0, a:255};
+        let place_holder_color2: Color = Color{r:0, g:200, b:0, a:255};
+        let place_holder_color3: Color = Color{r:200, g:200, b:0, a:255};
+        let place_holder_color4: Color = Color{r:0,g:0, b:255, a:255};
         // let place_holder_cell: Cell = Cell::new(place_holder_color);
         //gen center line length
         let mut matrix: Vec<Vec<Option<Color>>> = Vec::new();
@@ -189,7 +192,6 @@ impl Body{
                 temp_matrix.insert(0, None);
                 println!("test");
             }
-            // temp_matrix.insert(0, )
             matrix.insert(0, temp_matrix);
         }
         for line in 1..(below_count) as u8{
@@ -202,6 +204,35 @@ impl Body{
         }
 
         //gen the fins based off of scales
+        //tail fin
+        let total_length = length + 2;
+        for mut row in & mut matrix{
+            for i in 0..(total_length- row.len() as u8 - 2){
+                row.push(None);
+            }
+            row.push(Some(place_holder_color3.clone()));
+            row.push(Some(place_holder_color3.clone()));
+        }
+        //dorsal fin
+        let mut temp_fin_vec = vec![Some(place_holder_color2.clone()); (length as f64 - (above_count * 2.0) + 1.0) as usize];
+        for i in 0..((above_count) as u8){
+            temp_fin_vec.insert(0, None);
+        }
+        for i in 0..(total_length- temp_fin_vec.len() as u8 - 1){
+            temp_fin_vec.push(None);
+        }
+        temp_fin_vec.push(Some(place_holder_color3.clone()));
+        matrix.insert(0, temp_fin_vec);
+        //bottom fin
+        temp_fin_vec = vec![Some(place_holder_color2.clone()); (length as f64 - (below_count * 2.0) + 1.0) as usize];
+        for i in 0..((below_count) as u8){
+            temp_fin_vec.insert(0, None);
+        }
+        for i in 0..(total_length- temp_fin_vec.len() as u8 - 1){
+            temp_fin_vec.push(None);
+        }
+        temp_fin_vec.push(Some(place_holder_color3.clone()));
+        matrix.push(temp_fin_vec);
 
 
 
