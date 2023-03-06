@@ -25,6 +25,7 @@ const runWasm = async () => {
   };
   setInterval(() =>{
     tick();
-  })
+  }, 1000/24)
+  // tick();
 };
 runWasm();

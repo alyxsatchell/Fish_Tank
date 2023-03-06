@@ -45,6 +45,7 @@ pub fn tick(fish_tank: &mut FishTank){
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct Cell{
     color: Color,
     fisk: Option<Rc<RefCell<Fishy>>>
@@ -57,10 +58,15 @@ pub struct Pos{
     y: i32
 }
 
+pub struct Body{
+    colors: Vec<Color>,
+    matrix: Vec<Vec<Option<Color>>>
+}
+
 #[wasm_bindgen]
 pub struct Fishy {
     position: Pos,
-    // name: String,
+    body: Body,
     swim_speed: u8,
     direction: Direction,
     dir_count: u8,
@@ -90,6 +96,16 @@ impl Color {
 
     pub fn get_color_values(&self) -> (u8,u8,u8,u8){
         return (self.r, self.g, self.b, self.a)
+    }
+
+    pub fn gen_colors() -> Vec<Color>{
+        let mut colors = Vec::new();
+        let mut rng = rand::thread_rng();
+        let color_count = rng.gen_range(1..=5);
+        for i in 0..color_count{
+            colors.push(Color::new_rand());
+        }
+        return colors
     }
 }
 
@@ -144,6 +160,124 @@ impl Cell{
     }
 }
 
+impl Body{
+    fn gen_matrix(fish_height: u8) -> Vec<Vec<Option<Color>>>{
+        let place_holder_color: Color = Color{r:200, g:0, b:0, a:255};
+        let place_holder_color2: Color = Color{r:0, g:200, b:0, a:255};
+        let place_holder_color3: Color = Color{r:200, g:200, b:0, a:255};
+        let place_holder_color4: Color = Color{r:0,g:0, b:255, a:255};
+        let eye_color: Color = Color{r:0, b:0, g:0, a:255};
+        // let place_holder_cell: Cell = Cell::new(place_holder_color);
+        //gen center line length
+        let mut matrix: Vec<Vec<Option<Color>>> = Vec::new();
+        let mut rng = rand::thread_rng();
+        let length_modifier = rng.gen_range(0..=100);
+        let length = (fish_height as f64 * ((length_modifier / 100 + 2)) as f64 ).ceil() as u8;
+        //determine how long each of the scale lines will be
+
+        //gens dimensions
+        let above_count = (((fish_height - 1) / 2) as f64).ceil();
+        let below_count: f64 = fish_height as f64 - 1.0 - above_count;
+        let center_line_length = length;
+        let above_center_length = center_line_length - 1;
+        let eye_index = (center_line_length as f64 / 4.0 - 1.0).ceil() as usize;
+        //pushes the center line and the intial above and below at 1 less length then center
+        matrix.push(vec![Some(place_holder_color.clone());center_line_length.into()]);
+        matrix.insert(0, vec![Some(place_holder_color.clone());(center_line_length - 1).into()]);
+        //places the eye
+        matrix[0][eye_index].replace(eye_color.clone());
+        matrix.push(vec![Some(place_holder_color.clone());above_center_length.into()]);
+        //fills in the rest of the scales
+        //fills in the scales above the center line
+        for line in 1..(above_count) as u8{
+            let mut temp_matrix = vec![Some(place_holder_color.clone());(above_center_length - (2 * line)) as usize];
+            for i in 1..line + 1{
+                temp_matrix.insert(0, None);
+            }
+            matrix.insert(0, temp_matrix);
+        }
+        //fils in the scales below the center line
+        for line in 1..(below_count) as u8{
+            let mut temp_matrix = vec![Some(place_holder_color.clone());(above_center_length - (2 * line)) as usize];
+            for i in 1..line + 1{
+                temp_matrix.insert(0, None);
+            }
+            matrix.push(temp_matrix);
+        }
+
+        //gen the fins based off of scales
+        //tail fin
+        let total_length = length + 2;
+        for mut row in & mut matrix{
+            for i in 0..(total_length- row.len() as u8 - 2){
+                row.push(None);
+            }
+            row.push(Some(place_holder_color3.clone()));
+            row.push(Some(place_holder_color3.clone()));
+        }
+        //dorsal fin
+        let mut temp_fin_vec = vec![Some(place_holder_color2.clone()); (length as f64 - (above_count * 2.0) + 1.0) as usize];
+        for i in 0..((above_count) as u8){
+            temp_fin_vec.insert(0, None);
+        }
+        for i in 0..(total_length- temp_fin_vec.len() as u8 - 1){
+            temp_fin_vec.push(None);
+        }
+        temp_fin_vec.push(Some(place_holder_color3.clone()));
+        matrix.insert(0, temp_fin_vec);
+        //bottom fin
+        temp_fin_vec = vec![Some(place_holder_color2.clone()); (length as f64 - (below_count * 2.0) + 1.0) as usize];
+        for i in 0..((below_count) as u8){
+            temp_fin_vec.insert(0, None);
+        }
+        for i in 0..(total_length- temp_fin_vec.len() as u8 - 1){
+            temp_fin_vec.push(None);
+        }
+        temp_fin_vec.push(Some(place_holder_color3.clone()));
+        matrix.push(temp_fin_vec);
+
+        return matrix
+    }
+
+    pub fn new(fish_height: u8) -> Body{
+        let colors = Color::gen_colors();
+        let matrix = Body::gen_matrix(fish_height);
+        Body{colors: colors, matrix: matrix}
+    }
+
+    pub fn get_middle(&self) -> Pos{
+        let x = ((self.matrix.len() / 2) as f64).ceil() - 1.0;
+        let y = ((self.matrix[0].len() / 2) as f64).ceil() - 1.0;
+        return Pos{x: x as i32,y: y as i32}
+    }
+
+    pub fn reset(&self, grid: &mut Vec<Vec<Cell>>, x:i32, y:i32, fishy: &Rc<RefCell<Fishy>>){
+        let mid = self.get_middle();
+        for (x_index, row) in self.matrix.iter().enumerate(){
+            for (y_index, color) in row.iter().enumerate(){
+                let temp_x = x + x_index as i32 - mid.x;
+                let temp_y = y + y_index  as i32 - mid.y;
+                let mut temp_cell = & mut grid[temp_y as usize][temp_x as usize];
+                temp_cell.color = water_blue.clone();
+                temp_cell.fisk = None;
+            }
+        }
+    }
+
+    pub fn transpose(&self, grid: & mut Vec<Vec<Cell>>, x: i32, y: i32, fishy: &Rc<RefCell<Fishy>>){
+        let mid = self.get_middle();
+        for (x_index, row) in self.matrix.iter().enumerate(){
+            for (y_index, color) in row.iter().enumerate(){
+                let temp_x = x + x_index as i32 - mid.x;
+                let temp_y = y + y_index  as i32 - mid.y;
+                let mut temp_cell = & mut grid[temp_y as usize][temp_x as usize];
+                temp_cell.color = color.clone().unwrap_or(water_blue.clone());
+                temp_cell.fisk = Some(Rc::clone(fishy));
+            }
+        }
+    }
+}
+
 impl Fishy {
     pub fn new(size: Pos) -> Fishy{
         let color = Color::new_rand();
@@ -151,7 +285,24 @@ impl Fishy {
         let dir = Direction::new_rand();
         let dir_count = 0;
         let swim_speed = 1;
-        return Fishy{color: color, position: pos, swim_speed: swim_speed, direction: dir, dir_count: dir_count}
+        let body = Body::new(6);
+        return Fishy{color: color, position: pos, swim_speed: swim_speed, direction: dir, dir_count: dir_count, body: body}
+    }
+
+    pub fn check_wall(&self, new_pos:(i32,i32), size: &Pos) -> bool{
+        let (x,y) = new_pos;
+        let mid = self.body.get_middle();
+        let x_length = self.body.matrix[0].len();
+        let y_length = self.body.matrix.len();
+        //checks left side
+        let left = check_wall((x - mid.x,y), &size);
+        //checks top side
+        let top = check_wall((x,y - mid.y), &size);
+        //checks right side
+        let right = check_wall((x + x_length as i32, y), &size);
+        //checks bot side
+        let bot = check_wall((x, y + y_length as i32), &size);
+        return left || right || top || bot
     }
 
 
@@ -202,35 +353,36 @@ impl Fishy {
     }
 
     pub fn swim(& mut self, size: &Pos, grid: & mut Vec<Vec<Cell>>) -> (i32, i32){
-        grid[self.position.y as usize][self.position.x as usize].reset();
         self.new_dir();
         let (mut x,mut y) = self.swim_dir();
-        let mut hit_wall = check_wall((x,y), size);
+        let mut hit_wall = self.check_wall((x,y), size);
         if hit_wall{
             println!("Hit Wall");
             self.direction = self.direction.invert();
             hit_wall = true;
             (x,y) = self.swim_dir();
         }
-        let mut cell = &grid[y as usize][x as usize];
-        if cell.fisk.is_some(){
-            println!("Bonk");
-            if hit_wall{
-                println!("Stickin it out");
-                (x,y) = (self.position.x, self.position.y)
-            }
-            else{
-                self.direction = self.direction.invert();
-                (x,y) = self.swim_dir();
-                if check_wall((x,y), size){
-                    (x,y) = (self.position.x, self.position.y);
-                }
-            }
-        }
+        // let mut cell = &grid[y as usize][x as usize];
+        //note for now we are ignoring fish collisions and may implement them later if needed
+        // if cell.fisk.is_some(){
+        //     println!("Bonk");
+        //     if hit_wall{
+        //         println!("Stickin it out");
+        //         (x,y) = (self.position.x, self.position.y)
+        //     }
+        //     else{
+        //         self.direction = self.direction.invert();
+        //         (x,y) = self.swim_dir();
+        //         if check_wall((x,y), size){
+        //             (x,y) = (self.position.x, self.position.y);
+        //         }
+        //     }
+        // }
         self.position.x = x;
         self.position.y = y;
-        let mut cell = & mut grid[self.position.y as usize][self.position.x as usize];
-        cell.color = self.color.clone();
+        // let mut cell = & mut grid[self.position.y as usize][self.position.x as usize];
+        // cell.color = self.color.clone();
+
         return (x,y)
     }
 
@@ -355,8 +507,9 @@ impl FishTank{
     pub fn tick(& mut self){
         let size = self.size.clone();
         for fishy in &self.fishys{
+            fishy.borrow().body.reset(& mut self.grid, fishy.borrow().position.x, fishy.borrow().position.y, fishy);
             let (x,y) = fishy.borrow_mut().swim(&size, & mut self.grid);
-            self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
+            fishy.borrow().body.transpose(& mut self.grid, x, y, fishy);
         }
         self.push_canvas();
     }
@@ -376,6 +529,18 @@ impl fmt::Display for Direction {
             Direction::Left => string = "Left"
         };
         write!(f, "{}", string)
+    }
+}
+
+impl fmt::Display for Body{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for i in &self.matrix{
+            for col in i{
+                write!(f, "{}", col.as_ref().unwrap_or(&Color{r:0,b:0,g:0,a:0}));
+            }
+            write!(f, "\n");
+        }
+        write!(f, "{}", "")
     }
 }
 
