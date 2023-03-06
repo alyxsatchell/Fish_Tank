@@ -110,10 +110,10 @@ impl Color {
 }
 
 impl Pos{
-    pub fn new_rand(size: Pos) -> Pos{
+    pub fn new_rand(min: Pos, size: Pos) -> Pos{
         let mut rng = rand::thread_rng();
-        let x = rng.gen_range(0..size.x);
-        let y = rng.gen_range(0..size.y);
+        let x = rng.gen_range(min.x..size.x);
+        let y = rng.gen_range(min.y..size.y);
         return Pos{x,y}
     }
 }
@@ -281,11 +281,16 @@ impl Body{
 impl Fishy {
     pub fn new(size: Pos) -> Fishy{
         let color = Color::new_rand();
-        let pos = Pos::new_rand(size);
         let dir = Direction::new_rand();
         let dir_count = 0;
         let swim_speed = 1;
         let body = Body::new(6);
+        let mid = &body.get_middle();
+        let x_length = &body.matrix[0].len();
+        let y_length = &body.matrix.len();
+        let temp_size = Pos{x: size.x - x_length.clone() as i32, y: size.y - y_length.clone() as i32};
+        let temp_min = Pos{x: mid.x, y: mid.y};
+        let pos = Pos::new_rand(temp_min, temp_size);
         return Fishy{color: color, position: pos, swim_speed: swim_speed, direction: dir, dir_count: dir_count, body: body}
     }
 
