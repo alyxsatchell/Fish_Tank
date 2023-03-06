@@ -66,7 +66,6 @@ pub struct Body{
 #[wasm_bindgen]
 pub struct Fishy {
     position: Pos,
-    // name: String,
     body: Body,
     swim_speed: u8,
     direction: Direction,
@@ -252,6 +251,19 @@ impl Body{
         return Pos{x: x as i32,y: y as i32}
     }
 
+    pub fn reset(&self, grid: &mut Vec<Vec<Cell>>, x:i32, y:i32, fishy: &Rc<RefCell<Fishy>>){
+        let mid = self.get_middle();
+        for (x_index, row) in self.matrix.iter().enumerate(){
+            for (y_index, color) in row.iter().enumerate(){
+                let temp_x = x + x_index as i32 - mid.x;
+                let temp_y = y + y_index  as i32 - mid.y;
+                let mut temp_cell = & mut grid[temp_y as usize][temp_x as usize];
+                temp_cell.color = water_blue.clone();
+                temp_cell.fisk = None;
+            }
+        }
+    }
+
     pub fn transpose(&self, grid: & mut Vec<Vec<Cell>>, x: i32, y: i32, fishy: &Rc<RefCell<Fishy>>){
         let mid = self.get_middle();
         for (x_index, row) in self.matrix.iter().enumerate(){
@@ -341,7 +353,6 @@ impl Fishy {
     }
 
     pub fn swim(& mut self, size: &Pos, grid: & mut Vec<Vec<Cell>>) -> (i32, i32){
-        grid[self.position.y as usize][self.position.x as usize].reset();
         self.new_dir();
         let (mut x,mut y) = self.swim_dir();
         let mut hit_wall = self.check_wall((x,y), size);
@@ -496,10 +507,9 @@ impl FishTank{
     pub fn tick(& mut self){
         let size = self.size.clone();
         for fishy in &self.fishys{
+            fishy.borrow().body.reset(& mut self.grid, fishy.borrow().position.x, fishy.borrow().position.y, fishy);
             let (x,y) = fishy.borrow_mut().swim(&size, & mut self.grid);
             fishy.borrow().body.transpose(& mut self.grid, x, y, fishy);
-            // self.grid[y as usize][x as usize].fisk = Some(Rc::clone(fishy));
-
         }
         self.push_canvas();
     }
