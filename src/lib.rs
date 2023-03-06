@@ -182,7 +182,6 @@ impl Body{
         let center_line_length = length;
         let above_center_length = center_line_length - 1;
         let eye_index = (center_line_length as f64 / 4.0 - 1.0).ceil() as usize;
-        println!("Above: {}, Below: {}", above_count, below_count);
         //pushes the center line and the intial above and below at 1 less length then center
         matrix.push(vec![Some(place_holder_color.clone());center_line_length.into()]);
         matrix.insert(0, vec![Some(place_holder_color.clone());(center_line_length - 1).into()]);
@@ -278,6 +277,22 @@ impl Fishy {
         return Fishy{color: color, position: pos, swim_speed: swim_speed, direction: dir, dir_count: dir_count, body: body}
     }
 
+    pub fn check_wall(&self, new_pos:(i32,i32), size: &Pos) -> bool{
+        let (x,y) = new_pos;
+        let mid = self.body.get_middle();
+        let x_length = self.body.matrix[0].len();
+        let y_length = self.body.matrix.len();
+        //checks left side
+        let left = check_wall((x - mid.x,y), &size);
+        //checks top side
+        let top = check_wall((x,y - mid.y), &size);
+        //checks right side
+        let right = check_wall((x + x_length as i32, y), &size);
+        //checks bot side
+        let bot = check_wall((x, y + y_length as i32), &size);
+        return left || right || top || bot
+    }
+
 
     pub fn new_dir(& mut self){
         let cur_dir = &self.direction;
@@ -329,28 +344,29 @@ impl Fishy {
         grid[self.position.y as usize][self.position.x as usize].reset();
         self.new_dir();
         let (mut x,mut y) = self.swim_dir();
-        let mut hit_wall = check_wall((x,y), size);
+        let mut hit_wall = self.check_wall((x,y), size);
         if hit_wall{
             println!("Hit Wall");
             self.direction = self.direction.invert();
             hit_wall = true;
             (x,y) = self.swim_dir();
         }
-        let mut cell = &grid[y as usize][x as usize];
-        if cell.fisk.is_some(){
-            println!("Bonk");
-            if hit_wall{
-                println!("Stickin it out");
-                (x,y) = (self.position.x, self.position.y)
-            }
-            else{
-                self.direction = self.direction.invert();
-                (x,y) = self.swim_dir();
-                if check_wall((x,y), size){
-                    (x,y) = (self.position.x, self.position.y);
-                }
-            }
-        }
+        // let mut cell = &grid[y as usize][x as usize];
+        //note for now we are ignoring fish collisions and may implement them later if needed
+        // if cell.fisk.is_some(){
+        //     println!("Bonk");
+        //     if hit_wall{
+        //         println!("Stickin it out");
+        //         (x,y) = (self.position.x, self.position.y)
+        //     }
+        //     else{
+        //         self.direction = self.direction.invert();
+        //         (x,y) = self.swim_dir();
+        //         if check_wall((x,y), size){
+        //             (x,y) = (self.position.x, self.position.y);
+        //         }
+        //     }
+        // }
         self.position.x = x;
         self.position.y = y;
         // let mut cell = & mut grid[self.position.y as usize][self.position.x as usize];
