@@ -1,0 +1,1 @@
+A WebAssembly Project written in Rust to display a little tank of fishes in the browser. The project was primarily written as a test of what WebAssembly could do and to see if it was compatible for my ideas for further projects as an option for graphics.
